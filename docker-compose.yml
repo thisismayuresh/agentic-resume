@@ -1,0 +1,40 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama:/root/.ollama
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        ollama pull llama3.1
+        ollama pull nomic-embed-text
+    restart: 'no'
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - '8000:8000'
+    volumes:
+      - chroma:/chroma/chroma
+
+  # MongoDB - reserved for user/profile/credits persistence (schema comes later).
+  mongodb:
+    image: mongo:8
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo:/data/db
+
+volumes:
+  ollama:
+  chroma:
+  mongo:
