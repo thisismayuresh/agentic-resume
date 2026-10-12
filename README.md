@@ -71,21 +71,31 @@ There are three ways a user can start. All three land in the same editor screen.
 
 ### The editor screen
 
-Split view:
+Layout after the MVP cleanup:
 
 ```
-+-----------------------------+------------------------------+
-|  LEFT: agent / inputs       |  RIGHT: live resume preview  |
-|                             |                              |
-|  question flow, chat,       |  the actual resume page,     |
-|  uploads, match score,      |  clickable sections,         |
-|  warnings, export button    |  inline formatting controls  |
-+-----------------------------+------------------------------+
++--------------------------------------------------------------+
+| TOP BAR: app name            dark-mode toggle  Download (PDF/DOCX) |
++-----------------------------+--------------------------------+
+| LEFT: agent / inputs        | RIGHT: live resume preview     |
+|                             |                                |
+| warnings, chat with         | "Fit to one page" toggle,      |
+| suggested next steps,       | the actual resume page,        |
+| collapsible panels for      | clickable sections,            |
+| upload / job match / roast  | inline formatting controls     |
++-----------------------------+--------------------------------+
 ```
 
+- A top bar holds the Download control (top right) and the dark-mode toggle.
+  The resume paper itself stays white in every theme.
+- The left pane is chat-first. Upload, job match, and roast are collapsible
+  panels so the workspace reads as a conversation, not a wall of controls.
+- After a resume upload, suggested next steps appear in the chat (FR-16) and
+  the instant quality check reports anything odd (FR-15).
 - The user sees the resume being built and reformatted as the agent works.
 - Selecting text on the right shows guided controls: move the block, bold,
   bullet, reorder, delete, tweak wording.
+- "Fit to one page" switches the paper to compact type and margins.
 - An "AI is working" animation plays while the agent is editing (FR-5).
 - A small set of one-shot agent options sits on the left pane — Resume Roast
   and friends (FR-13).
@@ -254,6 +264,28 @@ The agent must handle bad input carefully and never produce harmful output.
   resume — in the default setup the only outbound call is to the local Ollama.
 - Coding agents working in this repo follow the same rule: they ask before
   reading any file outside the project folder.
+
+### FR-15 — Resume quality review
+
+- After an upload (and on demand through the chat suggestions), the app reads
+  the current resume and reports what looks off: missing contact details,
+  missing standard sections (Experience/Education/Skills), empty sections,
+  scattered bold/italics, ALL-CAPS walls, repeated words, and bullets too long
+  to scan.
+- The check is deterministic (no model call), so it runs instantly. Findings
+  show up as notes above the chat, each one a plain sentence the user can act
+  on.
+- It never edits the resume on its own — fixes go through the normal edit ops
+  or the Builder agent.
+
+### FR-16 — Suggested next steps
+
+- Once a resume exists in the session (usually right after an upload), the
+  chat shows a short list of suggested next steps — check for issues, fit on
+  one page, find ATS keyword gaps, tailor the summary, suggest improvements.
+- Picking a suggestion either runs the matching tool (quality check) or sends
+  the prompt to the Builder agent, which routes it with the usual guard rails
+  (FR-10). The user can always type a custom message instead.
 
 ---
 
@@ -439,9 +471,10 @@ Base path `/api`. JSON unless noted. The session id is a path param everywhere
 | `/api/sessions` | POST, empty | `{ sessionId: string }` |
 | `/api/sessions/:id` | GET | `SessionSnapshot` |
 | `/api/sessions/:id/messages` | POST `{ content: string }` | **SSE stream**: `op` → `ResumeOp`, `assistant` → `{ text }` chunk, `warning` → `{ code, message }`, `done`, `error` → `{ code, message }` |
-| `/api/sessions/:id/upload` | POST multipart `file` + `kind` (`resume` \| `jobDescription`) | `{ filename, text, resume?: ResumeDocument }` |
+| `/api/sessions/:id/upload` | POST multipart `file` + `kind` (`resume` \| `jobDescription`) | `{ filename, text, resume?: ResumeDocument, findings?: QualityFinding[], qualitySummary?: string }` |
 | `/api/sessions/:id/match` | POST `{ jobDescription: string }` | `MatchReport` |
 | `/api/sessions/:id/options/roast` | POST, empty | `RoastReport` |
+| `/api/sessions/:id/options/quality` | POST, empty | `QualityReport` (deterministic resume check, no model) |
 | `/api/sessions/:id/resume/ops` | POST `{ ops: ResumeOp[] }` | `SessionSnapshot` |
 | `/api/sessions/:id/export` | GET `?format=pdf` \| `?format=docx` | file download |
 
@@ -488,6 +521,15 @@ interface SessionSnapshot {
   jobDescription: string | null;
   warnings: { code: string; message: string }[];
 }
+interface QualityFinding {
+  code: string; // missing_contact | missing_section | odd_formatting | ...
+  message: string;
+  path?: string;
+}
+interface QualityReport {
+  findings: QualityFinding[];
+  summary: string;
+}
 ```
 
 SSE event names are exactly `op`, `assistant`, `warning`, `done`, `error`.
@@ -519,6 +561,20 @@ Credits (dummy, `backend/src/credits/`):
   (`InsufficientCreditsError` in `backend/src/shared/exceptions/`).
 - MongoDB is already in docker-compose for the eventual persistence.
 
+### 5.8 Resume quality checks
+
+`checkResumeQuality` (`backend/src/resume/quality-checks.ts`) is a pure
+function over the resume document — no model, no network. It powers FR-15:
+
+- runs automatically after every resume upload and its findings ride back on
+  the upload response (`findings`, `qualitySummary`);
+- runs on demand via `POST /api/sessions/:id/options/quality`;
+- the same findings feed the chat suggestion "Check my resume for issues".
+
+Patterns stay conservative: it flags structure and formatting problems a
+human would notice, not stylistic taste. A real spell-checker or an LLM
+review can layer on top later (see the backlog).
+
 ---
 
 ## 6. Design rules for the UI
@@ -528,6 +584,9 @@ The app must not look like a generic AI product.
 - **No AI clichés:** no blue/purple gradients, no glowing orb animation, no
   dark neon dashboard, no "✨ AI ✨" labels.
 - Neutral palette: grays, near-black accents, a white page for the resume.
+- Dark mode is a first-class theme (toggle in the top bar, choice persisted
+  in localStorage) built from the same CSS variables — and the resume paper
+  stays paper white in both themes.
 - Plain CSS in `frontend/src/styles/`. No Tailwind, no CSS-in-JS, no UI kits,
   no icon or font packages.
 - Only `react` and `react-dom` as runtime dependencies.
