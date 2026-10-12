@@ -20,6 +20,8 @@ version.
    intent behind the polished version.
 4. `frontend/.claude/skills/react-human-code/SKILL.md` — binding style rules
    for any change under `frontend/`.
+5. `backend/.claude/skills/nest-structure/SKILL.md` — binding import and
+   structure rules for any change under `backend/`.
 
 ## Where things live
 
@@ -28,10 +30,10 @@ version.
 | `frontend/` | React + TypeScript app (pnpm). Plain CSS, no UI kits, no extra runtime deps. |
 | `frontend/.claude/skills/` | Frontend code rules a coding agent must follow. |
 | `backend/` | NestJS (TypeScript, pnpm) — the only backend service: agent orchestration, resume model, match scoring, guard rails, upload, documents (pdf/docx parse + render), export, in-memory sessions. |
-| `backend/src/agent/` | The orchestrator and its sub-agents (intake → planner → writer → check), each with its own prompt file. |
+| `backend/src/agent/` | The orchestrator, the Resume Builder agent (gather → plan → draft → check → emit), and the Resume Review agent (roast), each with its own prompt file. |
 | `backend/src/shared/` | Custom exception classes, base commands, common utils. |
 | `samples/` | Sample ATS-friendly resumes, seeded into ChromaDB. |
-| `docker-compose.yml` | Ollama (chat + embedding model) and ChromaDB. |
+| `docker-compose.yml` | Ollama (chat + embedding model), ChromaDB, and MongoDB. |
 
 There is no Python/FastAPI service — NestJS does the whole backend, document
 parsing and PDF export included (see README §7 for the Nest rules).
@@ -45,11 +47,15 @@ exist right now. Scaffolding the apps is milestone 1 (see README §10).
   session store.
 - **pnpm only.** Use pnpm for every install, script, and workspace. No npm,
   no yarn.
-- **NestJS structure (README §7 has the full list):** small controllers and
-  services, `index.ts` barrels for imports/exports, DTOs at every boundary,
-  multi-step work as command objects with `execute()`, custom exported
-  exception classes (no bare `Error`), design patterns where they earn their
-  place, spreads used sparingly.
+- **NestJS structure (README §7 and the nest-structure skill have the full
+  list):** small controllers and services, `index.ts` barrels for
+  imports/exports, DTOs at every boundary, multi-step work as command objects
+  with `execute()`, custom exported exception classes (no bare `Error`),
+  design patterns where they earn their place, spreads used sparingly.
+- **Backend imports (nest-structure skill):** no `.js` extensions; same
+  folder `./file-name.service`; across modules only via the `@app/` alias and
+  the module barrel (`@app/resume`); never climb two directories — lint fails
+  on it.
 - **One concern per file.** No giant files that hold everything.
 - **No nested ternaries.** Use `if` / `if/else` / `switch`. Early returns.
   Max ~2 levels of nesting.

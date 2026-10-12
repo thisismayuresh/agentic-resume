@@ -130,10 +130,15 @@ Each requirement has an ID so we can refer to it in commits and docs.
 ### FR-5 — AI working animation
 
 - While the agent is generating or applying edits, a small, tasteful animation
-  indicates that work is happening.
+  indicates that work is happening. Two signals exist:
+  - a small star on the chat "Working on your resume…" line while the stream
+    is open;
+  - three small stars that pop out of the resume block the agent just edited,
+    alongside a brief background flash on that block.
 - It stops the moment the stream ends or the user hits stop.
 - The animation must not look flashy or "AI-ish" (no glowing orbs, no purple
-  gradients). See §6 for the visual rules.
+  gradients). The stars are plain text glyphs in the neutral palette — see §6
+  for the visual rules.
 
 ### FR-6 — File upload
 
@@ -179,6 +184,11 @@ The agent must handle bad input carefully and never produce harmful output.
 - Requests that ask for illicit, deceptive, or policy-violating content
   (fake credentials, fabricated employment, discrimination in hiring, etc.)
   are refused with a short, polite, non-preachy message.
+- Uploaded documents are scanned too (FR-6): the extracted text of every
+  `.pdf`/`.doc`/`.docx` is classified before it touches the session. A document
+  that is illicit content or fake-credential marketing is refused with a short
+  roast-flavored taunt in the Resume Roast voice (FR-13) — cheeky, never
+  cruel, never preachy. Nothing from a refused file is stored.
 - Curses or hostile/rude messages towards the agent are handled calmly; the
   agent stays on task and offers to continue.
 - General off-topic arguments are deflected in one sentence and the agent
@@ -259,6 +269,7 @@ The agent must handle bad input carefully and never produce harmful output.
 | LLM | Ollama, run in Docker | Requirement. Local, free, no API keys for a POC. |
 | Embeddings | Embedding model served by Ollama | Needed for semantic search over resumes/job descriptions. |
 | Vector store | ChromaDB | Requirement. Stores resume chunks, job-description chunks, and sample resumes for retrieval. |
+| Database | MongoDB (docker) | Sessions, users, and the credit ledger once auth lands. In the POC the session and credit stores are still in-memory; MongoDB is up in compose and `MONGODB_URI` is ready in `.env`. |
 | Document parsing / export | Popular Node libraries inside NestJS | Read `.doc`/`.docx`/`.pdf` and render the download with the most popular, battle-tested library for each format. See §7 for how they are wrapped. |
 
 ### System diagram
@@ -274,9 +285,11 @@ NestJS API
    |-- guardrails module (input/output classification + refusal copy)
    |-- upload module     (file intake, hands off to document reader)
    |-- documents module  (doc/docx/pdf -> text, resume -> pdf/docx)
+   |-- credits module    (dummy credit ledger, TODO: persist to MongoDB)
    |
-   +--> Ollama (docker)        : chat model + embedding model
+   +--> Ollama (docker)        : chat model + embedding model (OpenAI-compatible /v1)
    +--> ChromaDB               : retrieval (samples, resume chunks, JD chunks)
+   +--> MongoDB (docker)       : sessions, users, credit ledger (TODO: wiring)
 ```
 
 ### Why this split
@@ -286,8 +299,11 @@ NestJS API
   here. Python/FastAPI is skipped for now — NestJS does the whole job, and a
   second service would only add deployment and debugging weight at this stage.
 - **Ollama is the model layer.** One docker-compose file brings up Ollama with
-  a chat model and an embedding model pulled. Nothing in the app code knows
-  about a specific vendor — it talks to the Ollama HTTP API.
+  a chat model and an embedding model pulled. The backend talks to it through
+  an OpenAI-compatible client (`/v1` chat completions + embeddings), so the
+  same code works against Ollama now and a hosted provider later — switch by
+  changing `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `CHAT_MODEL`, and `EMBED_MODEL`
+  in `backend/.env`.
 - **ChromaDB is memory.** Sample resumes and parsed resume sections are chunked
   and embedded so the agent can retrieve relevant material instead of stuffing
   everything into a prompt.
@@ -298,7 +314,7 @@ NestJS API
 resume-agent/
   README.md                  <- this file (parent doc, always current)
   AGENTS.md                  <- quick context brief for coding agents
-  docker-compose.yml         <- ollama, chromadb, api, web
+  docker-compose.yml         <- ollama, chromadb, mongodb, api, web
   frontend/                  <- React + TS app (pnpm)
     .claude/skills/react-human-code/SKILL.md   <- frontend code rules
     src/
@@ -310,8 +326,9 @@ resume-agent/
       constants/
       types/
   backend/                   <- NestJS app (pnpm), the only backend service
+    .claude/skills/nest-structure/SKILL.md   <- backend import/structure rules
     src/
-      agent/                 <- orchestrator + sub-agents, prompts, edit-op emitters
+      agent/                 <- orchestrator + 2 specialized agents (builder, review), prompts
       resume/                <- resume model + operations
       match/                 <- match scoring
       guardrails/            <- refusal rules and classification
@@ -327,9 +344,10 @@ resume-agent/
 
 ## 5. Key design details
 
-### 5.1 The agent loop
+### 5.1 The agent loop (inside the Builder agent)
 
-The agent is a loop over discrete steps, each in its own file:
+The Resume Builder agent runs its work as a loop over discrete steps, each in
+its own file:
 
 1. `gather` — collect answers, parsed resume, job description.
 2. `plan` — decide section order and what the target job cares about.
@@ -342,39 +360,36 @@ is what makes the thing debuggable at 2 AM.
 
 ### 5.2 Agent orchestration
 
-This is a multi-agent product: work moves from one agent to the next. Each
-agent has exactly one job, takes a typed input, and returns a typed result. No
-agent calls another agent directly — an orchestrator in
-`backend/src/agent/` runs them in order and passes the result along.
+There are **two highly specialized agents**. Each has exactly one job, takes a
+typed input, and returns a typed result. No agent calls another agent
+directly — an orchestrator in `backend/src/agent/` picks the right agent for
+the request, passes the shared context, and owns failure handling.
 
-| Agent | Job | Hands off to |
-|---|---|---|
-| Intake agent | Reads answers, parsed resume, job description; spots what is missing and asks the user for it. | Planner agent |
-| Planner agent | Builds the section outline that fits the target job. | Writer agent |
-| Writer agent | Drafts each section from the user's real content, in plain recruiter language. | Check agent |
-| Check agent | Compares the draft with the job description, records gaps, writes the match verdict and any "not a fit" warning. | Emit step (edit ops) |
+| Agent | Job |
+|---|---|
+| **Resume Builder agent** | The only agent that writes resumes. Reads the answers, the parsed upload, and the job description; plans sections; drafts and rewrites text in plain recruiter language; checks the result against the job description; emits edit ops for the preview. Runs on every chat message and on guided answers. |
+| **Resume Review agent** | The Resume Roast (FR-13). One-shot, structured report with the fixed schema — rating, red flags, critical flaws, strengths, fixes. It never edits the resume. |
 
 Rules for orchestration:
 
 - The orchestrator owns the order, the shared context object, and the failure
   handling. If one agent fails, the run stops with a human-readable message —
   never a raw stack trace shown to the user.
-- Each agent and its prompts live in their own file, so a single step can be
-  re-run or swapped without touching the others.
-- Every hand-off is logged: which agent ran, what it received, what it passed
-  on, how long it took.
-- The guard rails module runs around the loop (input before the intake agent,
-  output before the edit ops reach the preview) — see §5.4.
-
-Action agents run outside this pipeline. When the user picks an option from
-the left pane (Resume Roast, FR-13, and others like it), the orchestrator runs
-that one agent on its own: read the current resume, produce a typed report,
-stream it to the pane. Same logging and guard-rail rules apply; no resume edit
-ops are produced unless the user applies a fix.
+- Each agent and its prompts live in their own file, so one agent can be
+  re-run or swapped without touching the other.
+- Every run is logged: which agent ran, what it received, what it produced,
+  how long it took.
+- The guard rails module runs around both agents (input before, output after)
+  — see §5.4.
+- The Builder agent's internal steps (§5.1) stay separate files even though
+  one agent owns them, so the loop stays debuggable.
+- The Review agent never produces resume edit ops. Applying a roast fix goes
+  through the normal edit ops (§5.3), one item at a time, user-confirmed.
 
 ### 5.3 Edit operations (how the UI animates changes)
 
-The agent never sends a whole new resume HTML blob. It sends operations:
+The agent never sends a whole new resume HTML blob. It sends operations
+(canonical shapes in §5.6):
 
 ```ts
 type ResumeOp =
@@ -393,11 +408,17 @@ user sees each change land. It also means undo is trivial later.
 - **Input side:** classify the user message before it reaches the model. Illicit
   requests, abusive messages, and off-topic prompts are routed to a canned
   response.
+- **Upload side:** every uploaded document's extracted text is classified
+  (`classify-document.ts`) before it is stored on the session. Illicit
+  documents and fake-credential marketing are refused with a roast-flavored
+  taunt (`refusal-copy.ts`), and nothing from the file reaches the session.
+  Patterns stay narrow on purpose — a security resume that mentions malware
+  or a chemistry thesis that mentions reagents must pass.
 - **Output side:** the drafted resume text is checked for fabricated
   credentials and policy-violating content before it hits the preview.
 - All refusal copy lives in one module with a short reason code
-  (`fabricated_credentials`, `abusive_message`, `off_topic`, ...). One place to
-  read, one place to change.
+  (`fabricated_credentials`, `illicit_document`, `abusive_message`,
+  `off_topic`, ...). One place to read, one place to change.
 
 ### 5.5 Match scoring
 
@@ -406,6 +427,97 @@ user sees each change land. It also means undo is trivial later.
 3. Produce three signals: skill overlap, experience-level fit, keyword coverage.
 4. Combine into a single percentage, and write a short verdict in plain
    language — including "this one is not for you" when the gap is large.
+
+### 5.6 API surface (POC)
+
+Base path `/api`. JSON unless noted. The session id is a path param everywhere
+— in-memory store, no auth. Both apps implement exactly these shapes (types in
+`backend/src/resume/` and `frontend/src/types/`).
+
+| Endpoint | Method + body | Returns |
+|---|---|---|
+| `/api/sessions` | POST, empty | `{ sessionId: string }` |
+| `/api/sessions/:id` | GET | `SessionSnapshot` |
+| `/api/sessions/:id/messages` | POST `{ content: string }` | **SSE stream**: `op` → `ResumeOp`, `assistant` → `{ text }` chunk, `warning` → `{ code, message }`, `done`, `error` → `{ code, message }` |
+| `/api/sessions/:id/upload` | POST multipart `file` + `kind` (`resume` \| `jobDescription`) | `{ filename, text, resume?: ResumeDocument }` |
+| `/api/sessions/:id/match` | POST `{ jobDescription: string }` | `MatchReport` |
+| `/api/sessions/:id/options/roast` | POST, empty | `RoastReport` |
+| `/api/sessions/:id/resume/ops` | POST `{ ops: ResumeOp[] }` | `SessionSnapshot` |
+| `/api/sessions/:id/export` | GET `?format=pdf` \| `?format=docx` | file download |
+
+Canonical types:
+
+```ts
+interface ResumeBlock {
+  id: string;
+  type: "heading" | "text" | "bulletList" | "entry";
+  text?: string;
+  bullets?: string[];
+  meta?: { company?: string; role?: string; start?: string; end?: string };
+}
+interface ResumeSection { id: string; title: string; blocks: ResumeBlock[]; }
+interface ResumeDocument {
+  fullName?: string;
+  contact?: { phone?: string; email?: string; location?: string };
+  sections: ResumeSection[];
+}
+type ResumeOp =
+  | { type: "insertSection"; at: number; section: ResumeSection }
+  | { type: "updateText"; path: string; text: string }
+  | { type: "moveBlock"; path: string; to: number }
+  | { type: "setStyle"; path: string; style: { bold?: boolean; italic?: boolean } }
+  | { type: "removeBlock"; path: string };
+interface MatchReport {
+  percentage: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  verdict: string;
+  fitWarning: string | null;
+}
+interface RoastReport {
+  rating: number;          // out of 10
+  verdict: string;
+  redFlags: { title: string; severity: "high" | "medium" | "low"; why: string }[];
+  criticalFlaws: string[];
+  strengths: string[];
+  fixes: { impact: "high" | "medium" | "low"; suggestion: string; rewrite?: string }[];
+}
+interface SessionSnapshot {
+  sessionId: string;
+  resume: ResumeDocument;
+  jobDescription: string | null;
+  warnings: { code: string; message: string }[];
+}
+```
+
+SSE event names are exactly `op`, `assistant`, `warning`, `done`, `error`.
+The frontend reads them by name; the backend emits them by name.
+
+### 5.7 Rate limits and credits
+
+Rate limits (`@nestjs/throttler`, in-memory counters per client IP):
+
+| Scope | Limit |
+|---|---|
+| Global (all routes) | 300 requests / minute |
+| `POST /api/sessions/:id/messages` (chat) | 20 / minute |
+| `POST /api/sessions/:id/options/roast` | 10 / minute |
+| `POST /api/sessions/:id/upload` | 10 / minute |
+| `POST /api/sessions/:id/match` | 15 / minute |
+
+Over the limit returns `429` with the standard throttler body.
+
+Credits (dummy, `backend/src/credits/`):
+
+- Every account starts with **10 signup bonus credits** and earns **5 free
+  credits once per day** (`SIGNUP_BONUS_CREDITS`, `DAILY_BONUS_CREDITS`).
+- The ledger is in-memory: interfaces (`CreditBalance`, `CreditTransaction`),
+  a grant/spend service skeleton, and `CreditCosts` — pricing per action is
+  deliberately not decided yet (see the backlog).
+- Spending a real balance is not wired to endpoints yet. When it is, an
+  exhausted balance fails with `insufficient_credits` on **HTTP 402**
+  (`InsufficientCreditsError` in `backend/src/shared/exceptions/`).
+- MongoDB is already in docker-compose for the eventual persistence.
 
 ---
 
@@ -419,9 +531,11 @@ The app must not look like a generic AI product.
 - Plain CSS in `frontend/src/styles/`. No Tailwind, no CSS-in-JS, no UI kits,
   no icon or font packages.
 - Only `react` and `react-dom` as runtime dependencies.
-- The AI-working animation (FR-5) is small and quiet — a subtle shimmer on the
-  section being edited, or a thin progress line. It reads as "loading", not as
-  "magic".
+- The AI-working animation (FR-5) is small and quiet — a thin progress line on
+  the chat composer, a brief flash on the edited block, and small star marks
+  (plain `✦` glyphs, neutral color, no glow) that pop out of an edited block
+  or twinkle beside the "Working…" line. Stars are the one exception to
+  "no ✨ AI ✨": they read as a hand-drawn mark, not magic.
 - Focus states, disabled states, and error messages are consistent everywhere.
 
 ---
@@ -486,7 +600,8 @@ the top of the file, and understand it.
 
 The frontend rules are also enforced by the repo skill in
 `frontend/.claude/skills/react-human-code/SKILL.md` (full text in §8), so any
-coding agent working in `frontend/` picks them up automatically.
+coding agent working in `frontend/` picks them up automatically. The backend
+rules are enforced by `backend/.claude/skills/nest-structure/SKILL.md`.
 
 ### Abort handling
 
@@ -510,10 +625,14 @@ The Nest codebase is the core of the product. Its quality bar is higher than
   service method per job. If a service file grows past what fits on a screen,
   split it — same "one concern per file" rule as the frontend.
 - **Structured imports and exports.** Every feature folder has an `index.ts`
-  barrel that exports what the rest of the app may use. Other code imports
-  through the barrel (`import { ResumeService } from '../resume'`), never a
-  deep path into a file (`.../resume/resume.service`). Same for
-  `shared/` — one clear import surface per module.
+  barrel that exports what the rest of the app may use. Three import styles
+  only, defined in the `backend/.claude/skills/nest-structure` skill:
+  extensionless file imports in the same folder (`./dtos/create-session.dto`,
+  `./commands/roast-resume.command` — never a `.js` suffix), one level of
+  `../` max inside your own module, and the `@app/` alias for everything
+  cross-module (`import { ResumeDocument } from '@app/resume'`). Never climb
+  `../../` — lint fails on it — and never deep-import another module's
+  internals; the barrel is the public surface.
 - **DTOs at every boundary.** Every request body, query, and response that
   crosses a module boundary is a named, exported DTO class, validated at the
   controller. No `any` bodies.
@@ -681,8 +800,8 @@ code reads like a human wrote it.
 ## 10. Milestones
 
 1. **Scaffold** — repo layout, pnpm workspaces, docker-compose (Ollama +
-   ChromaDB), Nest skeleton, React skeleton, documents module skeleton,
-   health checks.
+   ChromaDB + MongoDB), Nest skeleton, React skeleton, documents module
+   skeleton, health checks.
 2. **Editor shell** — split screen, resume preview component, in-place
    selection controls, plain-CSS theme.
 3. **Guided flow** — question sequence, answers stored on the session, preview
@@ -701,3 +820,22 @@ code reads like a human wrote it.
    fixed report structure, and per-fix apply through edit ops.
 
 Each milestone ends with: working demo, updated README, no nested ternaries.
+
+### Backlog (known TODOs, not in the POC)
+
+- **Multi-agent request classification.** The orchestrator currently treats
+  every chat message as Builder-agent work and routes Roast through its own
+  endpoint. A classifier in front of the orchestrator should route each
+  message to the Builder agent, the Review agent, or a plain answer (see
+  §5.2) — and refusal handling (FR-10) hangs off the same classifier.
+- **Wire sessions and credits to MongoDB.** The service is in compose and
+  `MONGODB_URI` is in `.env`; the session store and credit ledger are still
+  in-memory.
+- **Decide credit pricing** (`CreditCosts`) and where the balance shows in
+  the UI before enforcing spends (currently everything is free).
+- **Real auth.** "Continue with Google" / "Sign up with email" in the editor
+  are static placeholders (`frontend/src/pages/editor/AuthButtons.tsx`).
+- **Remove the pnpm release-age exclusion.** `backend/pnpm-workspace.yaml`
+  excludes `strtok3` from pnpm's 24h minimum release age while the transitive
+  dependency is too new. Delete `minimumReleaseAgeExclude` after 2026-10-13
+  and reinstall to confirm.
