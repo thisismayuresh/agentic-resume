@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DocumentsService } from '@app/documents';
 import { GuardrailsService } from '@app/guardrails';
+import { checkResumeQuality } from '@app/resume';
 import { DocumentParseError } from '@app/shared';
 import { SessionsService } from '@app/sessions';
 import { UploadResponseDto } from './dto/upload-response.dto';
@@ -37,6 +38,10 @@ export class UploadService {
     const resume = this.documents.extractResume(parsed.text);
     this.sessions.updateResume(sessionId, resume);
     response.resume = resume;
+
+    const report = checkResumeQuality(resume);
+    response.findings = report.findings;
+    response.qualitySummary = report.summary;
     return response;
   }
 }

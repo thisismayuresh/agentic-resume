@@ -1,6 +1,7 @@
 import { Controller, Param, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { RoastReport } from '@app/resume';
+import type { QualityReport, RoastReport } from '@app/resume';
+import { checkResumeQuality } from '@app/resume';
 import { SessionsService } from '@app/sessions';
 import { AgentOrchestrator } from './agent.orchestrator';
 
@@ -18,5 +19,14 @@ export class AgentOptionsController {
   roast(@Param('id') id: string): Promise<RoastReport> {
     const session = this.sessions.get(id);
     return this.orchestrator.runRoast({ session });
+  }
+
+  // The quality check is deterministic (no model), so it only needs a
+  // modest ceiling against scripted re-runs.
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Post('quality')
+  quality(@Param('id') id: string): QualityReport {
+    const session = this.sessions.get(id);
+    return checkResumeQuality(session.resume);
   }
 }

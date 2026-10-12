@@ -65,6 +65,7 @@ describe('upload, resume ops, match and export (e2e)', () => {
     expect(res.body.filename).toBe('resume.docx');
     expect(res.body.text).toContain('Jane Doe');
     expect(res.body.resume).toBeDefined();
+    expect(Array.isArray(res.body.findings)).toBe(true);
 
     const session = await request(app.getHttpServer())
       .get(`/api/sessions/${sessionId}`)
@@ -114,6 +115,17 @@ describe('upload, resume ops, match and export (e2e)', () => {
       .get(`/api/sessions/${sessionId}`)
       .expect(200);
     expect(session.body.resume.sections).toEqual([]);
+  });
+
+  it('returns a quality report for the session resume', async () => {
+    const sessionId = await createSession();
+
+    const res = await request(app.getHttpServer())
+      .post(`/api/sessions/${sessionId}/options/quality`)
+      .expect(201);
+
+    expect(Array.isArray(res.body.findings)).toBe(true);
+    expect(typeof res.body.summary).toBe('string');
   });
 
   it('applies resume ops through the ops endpoint', async () => {
