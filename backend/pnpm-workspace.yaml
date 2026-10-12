@@ -1,0 +1,6 @@
+# pnpm supply-chain policy: wait 24h before allowing newly published packages.
+# Exemption: strtok3 is a transitive dep of @nestjs/common (via file-type),
+# version already pinned in pnpm-lock.yaml.
+# TODO: remove this exemption after 2026-10-13 (once strtok3 is >24h old).
+minimumReleaseAgeExclude:
+  - strtok3

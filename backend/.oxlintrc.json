@@ -2,7 +2,18 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "rules": {
     "typescript/no-explicit-any": "off",
-    "typescript/no-floating-promises": "error"
+    "typescript/no-floating-promises": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["../../*", "../../../*", "../../../../*"],
+            "message": "Do not climb two or more directories. Cross-module imports use the @app/ alias (e.g. '@app/resume'); inside your module use one level of ../ or ./."
+          }
+        ]
+      }
+    ]
   },
   "env": {
     "node": true
