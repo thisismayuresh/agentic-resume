@@ -9,7 +9,15 @@ export type {
   ResumeSection,
 } from './resume';
 
-export type { MatchReport, RoastFix, RoastRedFlag, RoastReport, Severity } from './reports';
+export type {
+  MatchReport,
+  QualityFinding,
+  QualityReport,
+  RoastFix,
+  RoastRedFlag,
+  RoastReport,
+  Severity,
+} from './reports';
 
 export type {
   ChatMessage,

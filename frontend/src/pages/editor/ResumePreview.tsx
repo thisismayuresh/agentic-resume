@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
+import { FormButton } from '../../components/ui';
 import { blockPath, parseBlockPath } from '../../lib/resumeOps';
 import type { ResumeBlock, ResumeDocument, ResumeOp } from '../../types';
 import { BlockControlStrip } from './BlockControlStrip';
 import { BlockEditText } from './BlockEditText';
 import { ResumeBlockView } from './ResumeBlockView';
+
+const FIT_STORAGE_KEY = 'resume-fit-one-page';
 
 interface ResumePreviewProps {
   resume: ResumeDocument;
@@ -24,10 +27,17 @@ export function ResumePreview({
   onSelectedPathChange,
 }: ResumePreviewProps) {
   const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [fitOnePage, setFitOnePage] = useState(
+    () => window.localStorage.getItem(FIT_STORAGE_KEY) === '1',
+  );
 
   useEffect(() => {
     setEditingPath(null);
   }, [selectedPath]);
+
+  useEffect(() => {
+    window.localStorage.setItem(FIT_STORAGE_KEY, fitOnePage ? '1' : '0');
+  }, [fitOnePage]);
 
   const selectedBlock = blockAt(resume, selectedPath);
   const editingBlock = blockAt(resume, editingPath);
@@ -54,6 +64,15 @@ export function ResumePreview({
 
   return (
     <div className="resume-preview">
+      <div className="preview-header">
+        <span className="preview-header__label">Preview</span>
+        <FormButton
+          label={fitOnePage ? 'Show full size' : 'Fit to one page'}
+          variant="quiet"
+          onClick={() => setFitOnePage((current) => !current)}
+        />
+      </div>
+
       {selectedBlock !== null && selectedPath !== null && sectionOfSelection !== null ? (
         <div className="preview-toolbar">
           {editingPath !== null && editingBlock !== null ? (
@@ -80,7 +99,11 @@ export function ResumePreview({
         </p>
       ) : null}
 
-      <div className="resume-page" onClick={handlePageClick} role="presentation">
+      <div
+        className={`resume-page${fitOnePage ? ' resume-page--fit' : ''}`}
+        onClick={handlePageClick}
+        role="presentation"
+      >
         <header className="resume-header">
           <h1 className="resume-header__name">{resume.fullName ?? 'Your name'}</h1>
           <p className="resume-header__contact">{contactLine(resume)}</p>

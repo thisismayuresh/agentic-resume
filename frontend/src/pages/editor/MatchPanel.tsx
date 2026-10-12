@@ -23,7 +23,7 @@ export function MatchPanel({ sessionId, jobDescription }: MatchPanelProps) {
   };
 
   return (
-    <SectionCard title="Job match">
+    <SectionCard title="Job match" defaultOpen={false}>
       <FormTextArea
         id="match-job-description"
         label="Job description"

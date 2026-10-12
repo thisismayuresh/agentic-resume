@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FormButton, FormSelectInput, SectionCard } from '../../components/ui';
+import { FormButton, FormSelectInput } from '../../components/ui';
 import { useExport } from '../../hooks';
 import type { ExportFormat } from '../../types';
 
@@ -25,26 +25,25 @@ export function ExportRow({ sessionId }: ExportRowProps) {
   };
 
   return (
-    <SectionCard title="Export">
-      <div className="export-row">
-        <FormSelectInput
-          id="export-format"
-          label="Format"
-          value={format}
-          options={FORMAT_OPTIONS}
-          onChange={handleFormatChange}
-        />
-        <FormButton
-          label={isExporting ? 'Preparing…' : 'Download'}
-          onClick={handleDownload}
-          disabled={isExporting || sessionId === null}
-        />
-      </div>
+    <div className="export-controls">
+      <FormSelectInput
+        id="export-format"
+        label="Download format"
+        hideLabel
+        value={format}
+        options={FORMAT_OPTIONS}
+        onChange={handleFormatChange}
+      />
+      <FormButton
+        label={isExporting ? 'Preparing…' : 'Download'}
+        onClick={handleDownload}
+        disabled={isExporting || sessionId === null}
+      />
       {exportError ? (
-        <p className="inline-error" role="alert">
+        <p className="inline-error export-controls__error" role="alert">
           {exportError}
         </p>
       ) : null}
-    </SectionCard>
+    </div>
   );
 }

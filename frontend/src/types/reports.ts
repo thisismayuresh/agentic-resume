@@ -28,3 +28,14 @@ export interface RoastReport {
   strengths: string[];
   fixes: RoastFix[];
 }
+
+export interface QualityFinding {
+  code: string;
+  message: string;
+  path?: string;
+}
+
+export interface QualityReport {
+  findings: QualityFinding[];
+  summary: string;
+}

@@ -1,3 +1,4 @@
+import type { QualityFinding } from './reports';
 import type { ResumeDocument } from './resume';
 
 export interface SessionWarning {
@@ -35,4 +36,6 @@ export interface UploadResult {
   filename: string;
   text: string;
   resume?: ResumeDocument;
+  findings?: QualityFinding[];
+  qualitySummary?: string;
 }

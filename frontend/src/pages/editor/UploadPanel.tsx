@@ -1,10 +1,11 @@
 import { SectionCard } from '../../components/ui';
 import { useUpload } from '../../hooks';
+import type { UploadResult } from '../../types';
 import { UploadSlot } from './UploadSlot';
 
 interface UploadPanelProps {
   sessionId: string | null;
-  onUploaded: () => void;
+  onUploaded: (result: UploadResult) => void;
 }
 
 export function UploadPanel({ sessionId, onUploaded }: UploadPanelProps) {

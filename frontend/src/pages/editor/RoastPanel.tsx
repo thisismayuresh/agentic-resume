@@ -17,7 +17,7 @@ export function RoastPanel({ sessionId, selectedPath, applyOps }: RoastPanelProp
   };
 
   return (
-    <SectionCard title="Options">
+    <SectionCard title="Options" defaultOpen={false}>
       <FormButton
         label={isRoasting ? 'Roasting…' : 'Resume Roast'}
         onClick={handleRun}

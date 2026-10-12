@@ -1,7 +1,54 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-strong);
+  flex: none;
+}
+
+.topbar__brand {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--color-text);
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-controls .form-field--inline {
+  width: auto;
+}
+
+.export-controls .form-field__select {
+  width: auto;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.export-controls__error {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+}
+
 .editor {
   display: flex;
-  height: 100vh;
-  max-height: 100vh;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -23,8 +70,12 @@
   background: #ececed;
 }
 
+[data-theme='dark'] .editor__preview {
+  background: #131316;
+}
+
 .boot-screen {
-  height: 100vh;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -400,6 +451,49 @@
 
 .auth-buttons .form-button {
   flex: 1;
+}
+
+/* Suggested next steps shown after an upload (FR-16). */
+.suggested-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface-muted);
+}
+
+.suggested-prompts__title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.suggested-prompts__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Preview header: holds the one-page fit toggle above the paper. */
+.preview-header {
+  width: 100%;
+  max-width: 210mm;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preview-header__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
 }
 
 /* Star beside the "Working on your resume..." line while the agent streams. */

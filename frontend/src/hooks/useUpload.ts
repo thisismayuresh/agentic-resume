@@ -7,7 +7,7 @@ import type { DocumentKind, UploadResult, UploadSlotState } from '../types';
 
 interface UseUploadOptions {
   sessionId: string | null;
-  onUploaded: () => void;
+  onUploaded: (result: UploadResult) => void;
 }
 
 interface UseUploadResult {
@@ -60,7 +60,7 @@ export function useUpload({ sessionId, onUploaded }: UseUploadOptions): UseUploa
       try {
         const result = await uploadDocument<UploadResult>(apiPaths.upload(sessionId), file, kind);
         setSlotFor(kind, result);
-        onUploaded();
+        onUploaded(result);
       } catch (error) {
         setErrorFor(kind, friendlyMessage(error));
       } finally {

@@ -13,6 +13,8 @@ export const apiPaths = {
 
   roast: (sessionId: string): string => `/api/sessions/${sessionId}/options/roast`,
 
+  quality: (sessionId: string): string => `/api/sessions/${sessionId}/options/quality`,
+
   resumeOps: (sessionId: string): string => `/api/sessions/${sessionId}/resume/ops`,
 
   exportResume: (sessionId: string, format: ExportFormat): string =>
