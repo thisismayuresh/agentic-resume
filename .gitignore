@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds / caches
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# environments
+.env
+.env.local
+.env.*.local
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# logs / runtime
+*.log
+npm-debug.log*
+*.pid
+tmp/
