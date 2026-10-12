@@ -1,0 +1,257 @@
+.resume-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  min-height: 100%;
+}
+
+.preview-toolbar {
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  width: 100%;
+  max-width: 210mm;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+}
+
+.preview-error {
+  width: 100%;
+  max-width: 210mm;
+}
+
+.control-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.block-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.block-editor__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.resume-page {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 280mm;
+  background: #ffffff;
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 1px 3px rgba(24, 24, 27, 0.12);
+  padding: 16mm 18mm;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--font-serif);
+  color: #111111;
+}
+
+.resume-page__empty {
+  color: #6b7280;
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.resume-header {
+  border-bottom: 1px solid #d4d4d8;
+  padding-bottom: 10px;
+}
+
+.resume-header__name {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.resume-header__contact {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: #52525b;
+  margin-top: 2px;
+}
+
+.resume-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resume-section__title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid #d4d4d8;
+  padding-bottom: 3px;
+}
+
+.resume-block {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  cursor: pointer;
+}
+
+.resume-block:hover {
+  border-color: #e4e4e7;
+  background: #fafafa;
+}
+
+.resume-block:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.resume-block--selected {
+  border-color: #a1a1aa;
+  background: #f4f4f5;
+}
+
+.resume-block--changed {
+  animation: block-changed 1.4s ease-out;
+}
+
+.resume-block--bold .resume-block__text,
+.resume-block--bold .resume-block__heading,
+.resume-block--bold .resume-entry__details {
+  font-weight: 700;
+}
+
+.resume-block--italic .resume-block__text,
+.resume-block--italic .resume-entry__details {
+  font-style: italic;
+}
+
+@keyframes block-changed {
+  from {
+    background: #e8e8e4;
+  }
+  to {
+    background: transparent;
+  }
+}
+
+/* Small stars that pop out of a block while the agent is editing it (FR-5). */
+.resume-block__sparkles {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  pointer-events: none;
+}
+
+.resume-block__star {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--color-text, #18181b);
+  opacity: 0;
+  animation: star-pop 1.4s ease-out forwards;
+}
+
+.resume-block__star:nth-child(2) {
+  top: -9px;
+  right: 14px;
+  font-size: 9px;
+  animation-delay: 0.12s;
+}
+
+.resume-block__star:nth-child(3) {
+  top: -2px;
+  right: 26px;
+  font-size: 8px;
+  animation-delay: 0.26s;
+}
+
+@keyframes star-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(6px);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.15) translateY(-2px);
+  }
+  55% {
+    opacity: 0.85;
+    transform: scale(1) translateY(-7px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6) translateY(-14px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-block--changed {
+    animation: none;
+    background: #f1f1ef;
+  }
+
+  .resume-block__star {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.resume-block__heading {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.resume-block__text {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.resume-block__bullets {
+  list-style: disc;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resume-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.resume-entry__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.resume-entry__details {
+  font-weight: 600;
+}
+
+.resume-entry__dates {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: #52525b;
+  white-space: nowrap;
+}
